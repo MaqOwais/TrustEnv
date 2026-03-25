@@ -47,15 +47,15 @@ Supabase                     →  everything backend
   ├── Database                  Postgres — jobs, users, samples, statuses
   ├── Storage                   PDFs, sample photos
   ├── Realtime                  live job status updates
-  └── Edge Functions            notifications, business logic
-Expo Push Notifications      →  in-app push
-Twilio (via Edge Functions)  →  SMS alerts
-SendGrid (via Edge Functions) → email notifications
+  └── Edge Functions            business logic
+Expo Push Notifications      →  in-app push only
 ```
 
-### Phase 2 — Web Portal Added
+### Phase 2 — Web Portal + External Notifications
 ```
 Next.js                      →  web portal (TrustEnv + admin)
+Twilio                       →  SMS alerts
+SendGrid                     →  email notifications
 Everything from Phase 1 stays
 ```
 
@@ -97,6 +97,30 @@ Client finds TrustEnv on App Store / Play Store
 Signs up → fills inquiry form → job created
 ```
 
+### Way 3 — TrustEnv sends app store link
+```
+Client calls TrustEnv (phone/email)
+        ↓
+TrustEnv sends app download link via in-app message
+        ↓
+Client taps link
+        ↓
+   App installed?
+   ↙              ↘
+  YES               NO
+   ↓                 ↓
+Opens app         App Store / Play Store
+to inquiry form   Downloads app → opens to inquiry form
+        ↓
+Client fills: property address, survey type needed,
+              availability, any specifics
+        ↓
+Submits → job created → TrustEnv notified
+```
+
+> Way 1 and Way 3 differ: Way 1 uses a Supabase magic link (auto-authenticates client).
+> Way 3 sends a plain app store link — client creates their own account after downloading.
+
 ---
 
 ## Workflow — Step by Step
@@ -116,9 +140,11 @@ Notify:  TrustEnv (push + SMS)
 
 ### Step 2: Scheduling
 ```
-Actor:   TrustEnv
-Action:  Reviews inquiry
-         Selects nearest available technician based on location
+Actor:   TrustEnv + System
+Action:  TrustEnv reviews inquiry
+         System auto-assigns nearest available technician
+           based on: region match + availability
+         TrustEnv admin can override assignment if needed
          Confirms survey date
 Output:  Job status → SCHEDULED
 Notify:  Client     (confirmed date + technician name)
@@ -220,7 +246,8 @@ INTAKE → SCHEDULED → IN_SURVEY → SAMPLES_COLLECTED → SAMPLES_SENT
 | Client approved              | ✓        | ✓          |        |     |
 | Remediation complete         |          |            | ✓      |     |
 
-**Channels:** Push (Expo) + SMS (Twilio) + Email (SendGrid)
+**Phase 1 Channels:** Push notifications (Expo) — in-app only
+**Phase 2 Channels:** + SMS (Twilio) + Email (SendGrid)
 
 ---
 
@@ -231,7 +258,8 @@ INTAKE → SCHEDULED → IN_SURVEY → SAMPLES_COLLECTED → SAMPLES_SENT
 - All jobs dashboard
     Filter by: status, date, technician, location, survey type
 - Job detail: full timeline, sample logs, uploaded PDFs
-- Assign technician (location-aware — 20 techs across regions)
+- Technician auto-assigned by system (region + availability)
+- Admin can override assignment manually
 - Generate & send magic link to client
 - Add cost estimate + scope before dispatching report
 - Manually advance job status when needed
