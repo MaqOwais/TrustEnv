@@ -36,7 +36,7 @@ Supabase Auth handles login via email. No separate username — email is the ide
 
 ## Notifications
 
-**Phase 1 — In-app only.** No SMS, no email.
+**All notifications are in-app only.** No SMS at any phase.
 Every stakeholder tracks everything end-to-end through the app itself.
 
 ```
@@ -82,7 +82,6 @@ Expo Push Notifications      →  in-app push only
 ### Phase 2 — Web Portal + External Notifications
 ```
 Next.js                      →  web portal (TrustEnv + admin)
-Twilio                       →  SMS alerts
 SendGrid                     →  email notifications
 Everything from Phase 1 stays
 ```
@@ -100,7 +99,7 @@ Client calls TrustEnv (phone/email)
         ↓
 TrustEnv creates client profile + generates magic link in app
         ↓
-Supabase sends link to client via SMS or email
+Supabase sends link to client via email
         ↓
 Client taps link
         ↓
@@ -163,7 +162,7 @@ Action:  Fills inquiry form (via magic link or app)
          - Contact info
          - Any specifics (insurance claim number, referring company, etc.)
 Output:  Job created → status: INTAKE
-Notify:  TrustEnv (push + SMS)
+Notify:  TrustEnv (push)
 ```
 
 ### Step 2: Scheduling
@@ -275,7 +274,7 @@ INTAKE → SCHEDULED → IN_SURVEY → SAMPLES_COLLECTED → SAMPLES_SENT
 | Remediation complete         |          |            | ✓      |     |
 
 **Phase 1 Channels:** Push notifications (Expo) — in-app only
-**Phase 2 Channels:** + SMS (Twilio) + Email (SendGrid)
+**Phase 2 Channels:** + Email (SendGrid)
 
 ---
 
