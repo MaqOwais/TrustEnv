@@ -1,8 +1,8 @@
 # TrustEnv Workflow
 
 ## Overview
-TrustEnv orchestrates end-to-end environmental survey jobs (Asbestos, Lead, etc.)
-across 4 roles — keeping everyone in sync with no web portal required in Phase 1.
+TrustEnv orchestrates end-to-end environmental survey jobs across 4 roles —
+keeping everyone in sync through a single mobile app with no web portal in Phase 1.
 
 **TrustEnv is the single orchestrator.** Every job flows through them.
 
@@ -10,12 +10,30 @@ across 4 roles — keeping everyone in sync with no web portal required in Phase
 
 ## Roles
 
-| Role           | How They Access              | Responsibility                                      |
-|---------------|------------------------------|-----------------------------------------------------|
-| **TrustEnv**   | Mobile app                   | Create jobs, assign technicians, orchestrate flow   |
-| **Technician** | Mobile app                   | On-site survey, sample collection, photos           |
-| **Client**     | Deep link → app download     | Submit inquiry, track job, approve report & cost    |
-| **Lab**        | Mobile app                   | Receive sample manifest, upload final report PDF    |
+| Role           | How They Access                  | Responsibility                                      |
+|---------------|----------------------------------|-----------------------------------------------------|
+| **TrustEnv**   | Mobile app                       | Create jobs, assign technicians, orchestrate flow   |
+| **Technician** | Mobile app                       | On-site survey, sample collection, photos           |
+| **Client**     | Supabase magic link → app        | Submit inquiry, track job, approve report & cost    |
+| **Lab**        | Mobile app                       | Receive sample manifest, upload final report PDF    |
+
+**Staff:** 20 technicians across different locations (region-based assignment)
+
+---
+
+## Survey Types & Templates
+
+Each survey type has its own **sample collection form** (technician) and **report template** (lab).
+The app is template-driven — survey type selected at intake determines all downstream forms.
+
+| Survey Type        | Notes                                      |
+|-------------------|--------------------------------------------|
+| Asbestos           | PLM analysis, friability, condition rating |
+| Lead               | Lead Inspector/Assessor certified          |
+| Mold               | Visual + air/surface sampling              |
+| Wildfire           | Post-fire debris, ash, particulate         |
+| CAL 17 Heavy Metals| California-specific heavy metals panel     |
+| Bacteria           | Surface/water sampling                     |
 
 ---
 
@@ -23,47 +41,53 @@ across 4 roles — keeping everyone in sync with no web portal required in Phase
 
 ### Phase 1 — Mobile Only
 ```
-React Native + Expo     → mobile app (all 4 roles)
-Node.js API             → single backend
-PostgreSQL              → jobs, users, samples, statuses
-S3                      → PDFs, photos
-Twilio + SendGrid       → SMS + email notifications
-Branch.io               → deep link / deferred deep linking
+React Native + Expo          →  mobile app (all 4 roles)
+Supabase                     →  everything backend
+  ├── Auth                      magic links, JWT, role-based access
+  ├── Database                  Postgres — jobs, users, samples, statuses
+  ├── Storage                   PDFs, sample photos
+  ├── Realtime                  live job status updates
+  └── Edge Functions            notifications, business logic
+Expo Push Notifications      →  in-app push
+Twilio (via Edge Functions)  →  SMS alerts
+SendGrid (via Edge Functions) → email notifications
 ```
 
 ### Phase 2 — Web Portal Added
 ```
-Next.js                 → web portal (TrustEnv + admin)
+Next.js                      →  web portal (TrustEnv + admin)
 Everything from Phase 1 stays
 ```
 
 > AI-based report generation → future phase (not in scope now)
+> Lab creates report manually → uploads PDF via app
 
 ---
 
 ## How a Client Enters the System
 
-### Way 1 — TrustEnv sends a deep link
+### Way 1 — TrustEnv sends a magic link (Supabase Auth)
 ```
 Client calls TrustEnv (phone/email)
         ↓
-TrustEnv generates a unique deep link in app
+TrustEnv creates client profile + generates magic link in app
         ↓
-Link sent to client via SMS or email
+Supabase sends link to client via SMS or email
         ↓
 Client taps link
         ↓
    App installed?
-   ↙           ↘
-  YES            NO
-   ↓              ↓
-Opens app     App Store / Play Store
-to pre-filled      ↓
-inquiry form  Downloads app → opens to same form
+   ↙              ↘
+  YES               NO
+   ↓                 ↓
+Authenticated     App Store / Play Store
+opens directly    Downloads app
+to inquiry form   Magic link auto-authenticates
         ↓
-Client fills: availability, property details, job type
+Client fills: property address, survey type needed,
+              availability, any specifics
         ↓
-Submits → job created in system
+Submits → job created → TrustEnv notified
 ```
 
 ### Way 2 — Client downloads app independently
@@ -80,57 +104,62 @@ Signs up → fills inquiry form → job created
 ### Step 1: Intake
 ```
 Actor:   Client
-Action:  Fills inquiry form (via deep link or app)
+Action:  Fills inquiry form (via magic link or app)
          - Property address
-         - Type of survey needed
+         - Survey type (Asbestos / Lead / Mold / Wildfire / Heavy Metals / Bacteria)
          - Availability / preferred dates
          - Contact info
-Output:  Job created with status → INTAKE
-Notify:  TrustEnv (SMS + in-app)
+         - Any specifics (insurance claim number, referring company, etc.)
+Output:  Job created → status: INTAKE
+Notify:  TrustEnv (push + SMS)
 ```
 
 ### Step 2: Scheduling
 ```
 Actor:   TrustEnv
-Action:  Reviews inquiry, assigns technician, confirms date
+Action:  Reviews inquiry
+         Selects nearest available technician based on location
+         Confirms survey date
 Output:  Job status → SCHEDULED
-Notify:  Client (date + technician details)
-         Technician (job assigned, address, scope)
+Notify:  Client     (confirmed date + technician name)
+         Technician  (job assigned, site address, survey type, scope)
 ```
 
 ### Step 3: On-Site Survey
 ```
 Actor:   Technician
-Action:  Travels to site, collects samples
-         Logs in app:
+Action:  Travels to site
+         App loads the correct sample form for the survey type
+         Logs on-site:
            - Sample locations (area tested)
-           - Material type
-           - Photos
-           - Site diagram
+           - Material type + condition
+           - Friability (where applicable)
+           - Photos of each sample location
+           - Site diagram sketch
          Marks survey complete
 Output:  Job status → IN_SURVEY → SAMPLES_COLLECTED
-Notify:  TrustEnv (samples collected)
-         Lab (incoming samples — manifest sent)
+Notify:  TrustEnv  (samples collected, ready to dispatch)
+         Lab        (incoming samples — manifest sent automatically)
 ```
 
 ### Step 4: Samples to Lab
 ```
 Actor:   TrustEnv
-Action:  Confirms samples dispatched to lab
+Action:  Confirms physical samples dispatched to lab
 Output:  Job status → SAMPLES_SENT
-Notify:  Lab (sample manifest with job details)
-         Client (samples at lab, results coming)
+Notify:  Lab     (sample manifest: job ID, count, locations, survey type)
+         Client  (samples at lab, results coming)
 ```
 
 ### Step 5: Lab Analysis
 ```
 Actor:   Lab (e.g., MicroTest)
-Action:  Receives samples
-         Runs PLM analysis
-         Creates report PDF (manually, as today)
+Action:  Receives physical samples
+         Runs analysis (PLM, XRF, etc. depending on survey type)
+         Creates report PDF manually (per survey template)
          Uploads PDF to app
 Output:  Job status → LAB_COMPLETE
-Notify:  TrustEnv (results uploaded)
+Notify:  TrustEnv  (results uploaded — review needed)
          Technician (FYI)
 ```
 
@@ -138,8 +167,8 @@ Notify:  TrustEnv (results uploaded)
 ```
 Actor:   TrustEnv
 Action:  Reviews uploaded lab PDF
-         Adds cost estimate + scope of work
-         Sends to client via app
+         Adds cost estimate + scope of work for remediation
+         Sends report package to client via app
 Output:  Job status → REPORT_SENT
 Notify:  Client (report ready — view + approve in app)
 ```
@@ -148,21 +177,22 @@ Notify:  Client (report ready — view + approve in app)
 ```
 Actor:   Client
 Action:  Opens report in app
-         Reviews findings, cost, scope
-         Signs off / approves
+         Reviews findings, cost, scope of work
+         Approves in-app
 Output:  Job status → APPROVED
-Notify:  TrustEnv (approved, ready to schedule remediation)
-         Technician (prepare for job)
+Notify:  TrustEnv  (approved — schedule remediation)
+         Technician (prepare for remediation job)
 ```
 
 ### Step 8: Remediation
 ```
 Actor:   Technician
-Action:  Goes on-site, performs remediation work
+Action:  Dispatched to site
+         Performs remediation work per approved scope
          Marks job complete in app
 Output:  Job status → CLOSED
-Notify:  Client (job complete)
-         TrustEnv (job closed)
+Notify:  Client     (job complete)
+         TrustEnv   (job closed)
 ```
 
 ---
@@ -190,7 +220,7 @@ INTAKE → SCHEDULED → IN_SURVEY → SAMPLES_COLLECTED → SAMPLES_SENT
 | Client approved              | ✓        | ✓          |        |     |
 | Remediation complete         |          |            | ✓      |     |
 
-**Channels:** SMS (Twilio) + Push notification (Expo) + Email (SendGrid)
+**Channels:** Push (Expo) + SMS (Twilio) + Email (SendGrid)
 
 ---
 
@@ -198,37 +228,45 @@ INTAKE → SCHEDULED → IN_SURVEY → SAMPLES_COLLECTED → SAMPLES_SENT
 
 ### TrustEnv
 ```
-- All jobs dashboard (filter by status, date, technician)
-- Job detail: full timeline, all uploads, sample logs
-- Assign / reassign technician
-- Generate & send deep link to client
-- Add cost estimate + scope before sending report
-- Advance job status manually when needed
+- All jobs dashboard
+    Filter by: status, date, technician, location, survey type
+- Job detail: full timeline, sample logs, uploaded PDFs
+- Assign technician (location-aware — 20 techs across regions)
+- Generate & send magic link to client
+- Add cost estimate + scope before dispatching report
+- Manually advance job status when needed
 ```
 
 ### Technician
 ```
-- My jobs (today + upcoming)
-- Job detail: address, scope, what to sample
-- Sample logging: area, material, photo, condition
+- My jobs (today + upcoming), sorted by location
+- Job detail: site address, survey type, scope
+- Template-driven sample log (form changes per survey type)
+    Asbestos → area, material, friability, condition, P5 required
+    Lead     → component, substrate, paint condition, XRF reading
+    Mold     → location, visible growth, moisture reading
+    ...etc
+- Photo capture per sample location
 - Digital chain-of-custody form
-- Mark steps complete (drives status forward)
+- Mark steps complete → drives status forward
 ```
 
 ### Client
 ```
-- Job status timeline (what's done, what's next)
-- Technician info (name, arrival time)
-- Report PDF viewer
-- Approve + sign off on scope & cost
+- Job status timeline (what's done, what's next, plain language)
+- Technician info (name, eta when en route)
+- Report PDF viewer (lab results)
+- Cost + scope review
+- In-app approval
 - Notifications at every step
 ```
 
 ### Lab
 ```
-- Incoming sample manifest (job ID, sample count, locations)
-- Upload final report PDF
-- Job reference details (address, technician, work order)
+- Incoming sample manifest
+    Job ID, work order, survey type, sample count, collection locations
+- Upload final report PDF (per survey type template)
+- Job reference: site address, technician, dates
 ```
 
 ---
@@ -238,42 +276,61 @@ INTAKE → SCHEDULED → IN_SURVEY → SAMPLES_COLLECTED → SAMPLES_SENT
 ```
 Job {
   id
-  work_order_id         // e.g., WO-19212
+  work_order_id           // e.g., WO-19212
   claim_number
-  status                // enum: phases above
-  survey_type           // Limited | Full | Other
+  status                  // enum: INTAKE → CLOSED
+  survey_type             // asbestos | lead | mold | wildfire | heavy_metals | bacteria
   site_address
+  region                  // for technician assignment
   client_id
   technician_id
   lab_id
+  cost_estimate
+  scope_of_work
   created_at
   updated_at
   samples[]
-  documents[]           // lab PDF, chain-of-custody
-  status_history[]      // full audit trail
-  cost_estimate
-  scope_of_work
+  documents[]             // lab PDF, chain-of-custody
+  status_history[]        // full audit trail with timestamps + actor
 }
 
 Sample {
   id
   job_id
+  survey_type             // determines which fields are relevant
   area_tested
   material
   result
   quantity
-  friability            // F | NF
-  condition             // G | D | SD
+  // Asbestos-specific
+  friability              // F | NF
+  condition               // G | D | SD
+  p5_required             // bool
+  // Lead-specific
+  xrf_reading
+  paint_condition
+  // Mold-specific
+  moisture_reading
+  visible_growth
+  // ...extensible per survey type
   photos[]
 }
 
 User {
   id
-  role                  // trustenv | technician | client | lab
+  role                    // trustenv | technician | client | lab
   name
   email
   phone
-  deep_link_token       // for client magic link
+  region                  // technician only
+  magic_link_token        // client onboarding (Supabase Auth)
+}
+
+SurveyTemplate {
+  id
+  survey_type
+  sample_fields[]         // defines what technician sees on-site
+  report_schema           // defines expected lab report structure
 }
 ```
 
@@ -281,10 +338,12 @@ User {
 
 ## Open Questions for TrustEnv
 
-1. How many technicians are currently on staff?
-2. Are there multiple lab partners or exclusively MicroTest?
-3. What survey types beyond Asbestos are offered? (Lead, Mold, etc.)
-4. How is cost estimate currently calculated — manual or formula-based?
-5. Does client approval require a legal e-signature or a simple in-app confirm?
-6. What's the current average turnaround from survey to report delivery?
-7. Any compliance/retention requirement for how long job records must be kept?
+| #  | Question                                                                 | Status      |
+|----|-------------------------------------------------------------------------|-------------|
+| 1  | How many technicians on staff?                                           | ✓ 20, multi-location |
+| 2  | Multiple lab partners or exclusively MicroTest?                          | Pending     |
+| 3  | Survey types offered?                                                    | ✓ 6 types   |
+| 4  | How is cost estimate calculated — manual or formula-based?               | Pending     |
+| 5  | Client approval — legal e-signature or simple in-app confirm?            | Pending     |
+| 6  | Average turnaround from survey to report delivery?                       | Pending     |
+| 7  | Compliance/retention requirement for job records?                        | Pending     |
