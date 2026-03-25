@@ -391,6 +391,39 @@ SurveyTemplate {
 
 ---
 
+## Problems This Solves
+
+### Operational
+- **Eliminates customer care overhead** — clients track everything in the app, no need to call
+- **Reduces inbound calls to TrustEnv** — status, report, approval all self-served
+- **Everyone on the same page** — TrustEnv, technician, client, and lab see the same job state in real time
+- **Removes verbal handoff errors** — no miscommunication between TrustEnv → technician → lab
+- **Eliminates manual status follow-ups** — every stakeholder is notified automatically at each step
+- **Full audit trail** — every action is timestamped with actor, giving a complete job history
+- **Faster turnaround** — no delays from missed calls, lost emails, or unclear next steps
+
+### Business
+- **Scales without adding admin headcount** — 20 technicians across regions managed from one screen
+- **Technician accountability** — timestamped sample logs and photos tied to every job
+- **Dispute protection** — full record of approvals, report uploads, and client sign-offs
+- **Standardization** — all 6 survey types follow the same consistent process, regardless of technician
+
+### Data
+- **Operational visibility** — track turnaround times per survey type, technician, and region
+- **Spot bottlenecks** — e.g., lab delays, technician overload in a specific region
+- **Foundation for future analytics** — job volume trends, revenue forecasting, performance benchmarks
+
+---
+
+## Future Versions
+
+1. **AI Report Generation** — auto-generate reports from sample data collected in-app, removing manual lab report creation
+2. **Payment Integration** — client pays within the app after approving scope and cost
+3. **Decoupled Infrastructure** — separate backend services per domain (jobs, notifications, reports, auth) for scalability + lower load; web app added for TrustEnv admin and partners
+4. **Email Notifications** — SendGrid integration for formal report delivery and job updates via email
+
+---
+
 ## Open Questions for TrustEnv
 
 | #  | Question                                                                 | Status      |
