@@ -21,6 +21,34 @@ keeping everyone in sync through a single mobile app with no web portal in Phase
 
 ---
 
+## Onboarding
+
+Every user (all roles) goes through onboarding when they first open the app:
+```
+Name
+Email                ← used as login identifier
+Phone number
+Role assigned        ← by TrustEnv (technician, lab) or self (client)
+```
+Supabase Auth handles login via email. No separate username — email is the identity.
+
+---
+
+## Notifications
+
+**Phase 1 — In-app only.** No SMS, no email.
+Every stakeholder tracks everything end-to-end through the app itself.
+
+```
+Push notification (Expo)  →  alerts when status changes
+In-app feed               →  full history of all job updates
+Real-time status          →  Supabase Realtime keeps job view live
+```
+
+No need to leave the app to know what's happening at any stage.
+
+---
+
 ## Survey Types & Templates
 
 Each survey type has its own **sample collection form** (technician) and **report template** (lab).
